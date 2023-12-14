@@ -1,0 +1,45 @@
+--Use the subquery to list products that were ordered in March 2005
+
+select p.productCode, productName
+from products p
+where productCode in (select productCode from orderdetails
+                     where orderNumber in(select orderNumber from orders
+                                         where year(orderDate) = 2005 and month(orderDate) = 3))
+										 
+										 
+--Use the subquery to display information about orders in the most recent month (using
+--information from the orders table).
+
+select * from orders
+where year(orderDate) = year((select max(orderDate) from orders))
+	and month(orderDate) = month((select max(orderDate) from orders))
+	
+--Use subqueries to give information about orders and total value of this order
+
+SELECT orderNumber,
+	(select sum(priceEach * quantityOrdered)
+    from orderdetails
+    where orderNumber = o.orderNumber) as totalValue
+FROM orders o
+
+
+--Use the subquery get the customer's name and the total amount they have to pay.
+select
+	customerNumber,
+	(select sum(priceEach * quantityOrdered)
+    from orderdetails
+    where orderNumber in(select orderNumber
+                        from orders
+                        where customerNumber = o.customerNumber)) as totalPurchased,
+	(select sum(amount)
+    from payments
+    where customerNumber = o.customerNumber) as totalPaid,
+	(select totalPurchased - totalPaid) as totalDebt,
+	ifnull((select sum(priceEach * quantityOrdered)
+    from orderdetails 
+    where orderNumber in (select orderNumber from orders
+                         where status = "Cancelled" and customerNumber = o.customerNumber)), 0) as totalCancelled,
+	(select totalDebt - totalCancelled) as actualDebt
+
+from orders o
+group by o.customerNumber

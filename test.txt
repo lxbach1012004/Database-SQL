@@ -1,0 +1,126 @@
+//Question 1: RFM Analysis (3 points)
+RFM model uses sales data to segment a pool of customers based on their purchasing behavior. The resulting customer segments are neatly ordered from most valuable to least valuable. This makes it straightforward to identify best customers.
+in each customer record you must maintain three pieces of information:
+a) Recency-The interval from the date of making statistics (2/6/2005) to the date of the most recent purchase by the customer.
+b) A counter for the Frequency-the number of times the customer has made an order.
+c) A counter for the Monetary amount-the total money that the customer has ordered.
+Using classicmodel database, please write 1 query that calculates the above 3 indexes for each customer who has ever ordered on the system. The output has the following format: CustomerName CustomerNumber, Recency, Frequency, Monetary
+//
+
+SELECT 
+	customerNumber,
+	DATEDIFF("2005/6/2", MAX(orderDate)) AS Recency,
+	COUNT(o.orderNumber) AS Frequency,
+	(
+		SELECT SUM(priceEach * quantityOrdered)
+		FROM orderdetails
+		WHERE orderNumber IN (
+			SELECT orderNumber 
+			FROM orders 
+			WHERE customerNumber = o.customerNumber
+		)
+	) AS Monetary
+FROM orders o
+GROUP BY customerNumber
+ORDER BY Monetary DESC
+
+------------------------------------------------------------------------------------------------
+//Question 2: Best customers (1 point)
+//Based on the results of the above query, write a query show a list of customers with Recency <= 5 and Frequency >= 5 or with Monetary >= $500,000.
+
+SELECT
+    c.customerName,
+    c.customerNumber,
+    DATEDIFF('2005-06-02', MAX(o.orderDate)) AS Recency,
+    COUNT(o.orderNumber) AS Frequency,
+    SUM(od.quantityOrdered * od.priceEach) AS Monetary
+FROM
+    customers c
+JOIN orders o ON c.customerNumber = o.customerNumber
+JOIN orderdetails od ON o.orderNumber = od.orderNumber
+GROUP BY
+    c.customerNumber
+HAVING
+    (Recency <= 5 AND Frequency >= 5) OR Monetary >= 500000
+ORDER BY
+    Monetary DESC;
+
+
+------------------------------------------------------------------------------------------------
+//Question 3: (2 points)
+//Write 01 query to display name, text description, and the total quantity of products of productline that have total quantity of products greater than 50.000. Sort in descending order of quantity.
+(Hint: total quantity of products in stock + sold).
+
+SELECT 
+	pl.productLine,
+	(SELECT SUM(quantityInStock)
+	FROM products
+	WHERE productLine = pl.productLine
+	) AS totalInStock,
+	
+	(SELECT SUM(quantityOrdered)
+	FROM orderdetails
+	WHERE productCode IN (SELECT productCode
+				  FROM products
+				  WHERE productLine = pl.productLine)) AS totalOrdered, 
+					  
+	(SELECT totalInStock + totalOrdered) AS totalQuantityProducts
+FROM productlines pl;
+
+
+
+------------------------------------------------------------------------------------------------
+//Question 4: (2 points!
+//Write 01 query to display name, total purchase amount, total paid amount, and total debt of small customers whose total purchase amount is less than $100,000
+
+SELECT 
+	c.customerNumber,
+	c.customerName,
+	(SELECT SUM(quantityOrdered * priceEach)
+    	FROM orderdetails
+   	WHERE orderNumber IN 
+(SELECT orderNumber
+                            FROM orders
+                            WHERE customerNumber = c.customerNumber)
+) as totalOrdered,
+	
+	(SELECT SUM(amount)
+    	FROM payments
+    	WHERE customerNumber = c.customerNumber
+) as totalPaid,
+
+	(SELECT totalOrdered - totalPaid) AS totalDebt
+
+FROM customers c
+GROUP BY c.customerNumber
+HAVING totalOrdered < 100000
+
+
+------------------------------------------------------------------------------------------------
+//Question 5: (1 point)
+//Create a new table based on the definition of table payments, including any column attributes and indexes defined in the table products, name it new_payments (Hint: use LIKE)
+//Insert into table new payments all entries of table payments that have the amount greater than 50.000.
+
+CREATE TABLE new_payments LIKE payments;
+
+INSERT INTO new_payments
+SELECT *
+FROM payments
+WHERE amount > 50000;
+
+
+------------------------------------------------------------------------------------------------
+//Question 6: (1 point)
+//Write 01 query to display information of productlines and their corresponding inventory money (int inventory money could be calculated using buy price)
+
+SELECT
+    pl.productLine,
+    pl.textDescription,
+    SUM(p.quantityInStock * p.buyPrice) AS InventoryMoney
+FROM
+    productlines pl
+JOIN products p ON pl.productLine = p.productLine
+GROUP BY
+    pl.productLine, pl.textDescription
+ORDER BY
+    InventoryMoney DESC;
